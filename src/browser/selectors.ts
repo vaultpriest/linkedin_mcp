@@ -1,5 +1,6 @@
 // LinkedIn CSS Selectors
-// IMPORTANT: LinkedIn frequently changes UI - update selectors here when needed
+// IMPORTANT: LinkedIn frequently changes UI - these selectors use stable DOM structure
+// instead of class names which change frequently
 
 export const SELECTORS = {
   // ============================================
@@ -7,118 +8,122 @@ export const SELECTORS = {
   // ============================================
   search: {
     // Main search input (top bar)
-    input: 'input.search-global-typeahead__input',
-    inputAlternative: 'input[placeholder="Search"]',
+    input: 'input[placeholder*="Szukaj"], input[placeholder*="Search"]',
+    inputAlternative: 'input.search-global-typeahead__input',
 
-    // Search results container
-    resultsContainer: '.search-results-container',
-    resultsList: '.reusable-search__entity-result-list',
+    // Search results container - use structure-based selectors
+    resultsContainer: 'main',
+    resultsList: 'main ul',
 
-    // Individual result item
-    resultItem: '.entity-result',
-    resultItemAlternative: 'li.reusable-search__result-container',
+    // Individual result item - li containing profile link
+    resultItem: 'main ul > li:has(a[href*="/in/"])',
+    resultItemAlternative: 'main li:has(a[href*="/in/"])',
 
-    // Result item details
-    resultName: '.entity-result__title-text a span[aria-hidden="true"]',
-    resultNameAlternative: '.entity-result__title-text a',
-    resultHeadline: '.entity-result__primary-subtitle',
-    resultLocation: '.entity-result__secondary-subtitle',
-    resultImage: '.entity-result__image img',
-    resultConnectionDegree: '.entity-result__badge-text',
+    // Result item details - based on structure, not classes
+    // Name is in the link pointing to profile
+    resultName: 'a[href*="/in/"] span[aria-hidden="true"]',
+    resultNameAlternative: 'a[href*="/in/"]',
+    // Headline is typically the 2nd paragraph in the item
+    resultHeadline: 'li p:nth-of-type(1)',
+    // Location is typically the 3rd paragraph
+    resultLocation: 'li p:nth-of-type(2)',
+    resultImage: 'img[alt]',
+    // Connection degree is in span/text near the name
+    resultConnectionDegree: 'span:has-text("1st"), span:has-text("2nd"), span:has-text("3rd"), span:has-text("3.+")',
 
     // Pagination / Load more
-    loadMoreButton: 'button.scaffold-finite-scroll__load-button',
-    nextPageButton: 'button[aria-label="Next"]',
+    loadMoreButton: 'button:has-text("więcej"), button:has-text("more")',
+    nextPageButton: 'button[aria-label*="Dalej"], button[aria-label*="Next"]',
 
     // Filters
-    filterContainer: '.search-reusables__filters-bar',
-    locationFilter: 'button[aria-label="Locations filter"]',
-    locationFilterAlternative: 'button:has-text("Locations")',
-    filterInput: 'input[placeholder="Add a location"]',
-    applyFilterButton: 'button[data-test-reusables-filter-apply-button]',
+    filterContainer: 'div[role="toolbar"], [class*="filter"]',
+    locationFilter: 'button[aria-label*="Lokalizacj"], button[aria-label*="Location"]',
+    locationFilterAlternative: 'button:has-text("Lokalizacj"), button:has-text("Location")',
+    filterInput: 'input[placeholder*="lokalizacj"], input[placeholder*="location"]',
+    applyFilterButton: 'button:has-text("Zastosuj"), button:has-text("Apply")',
 
     // No results
-    noResults: '.search-reusable-search-no-results',
+    noResults: '[class*="no-result"], :has-text("Brak wyników")',
   },
 
   // ============================================
   // Profile Page
   // ============================================
   profile: {
-    // Main info
-    name: 'h1.text-heading-xlarge',
-    nameAlternative: '.pv-text-details__left-panel h1',
-    headline: '.text-body-medium.break-words',
-    headlineAlternative: '.pv-text-details__left-panel .text-body-medium',
-    location: '.text-body-small.inline.t-black--light.break-words',
-    locationAlternative: '.pv-text-details__left-panel span.text-body-small',
+    // Main info - use semantic selectors
+    name: 'main h1',
+    nameAlternative: 'h1[class*="text-heading"]',
+    headline: 'main h1 + div, main section div[class*="text-body-medium"]',
+    headlineAlternative: 'main section:first-of-type div:nth-of-type(2)',
+    location: 'main span[class*="text-body-small"]',
+    locationAlternative: 'main section:first-of-type span:has-text(",")',
 
     // About section
-    aboutSection: '#about',
-    aboutContent: '#about ~ .display-flex .pv-shared-text-with-see-more span[aria-hidden="true"]',
-    aboutSeeMore: '#about ~ .display-flex button.inline-show-more-text__button',
+    aboutSection: '#about, section:has(h2:has-text("O mnie")), section:has(h2:has-text("About"))',
+    aboutContent: '#about ~ div span[aria-hidden="true"], section:has(h2:has-text("O mnie")) span[aria-hidden="true"]',
+    aboutSeeMore: '#about ~ div button, section:has(h2:has-text("O mnie")) button:has-text("więcej")',
 
     // Experience section
-    experienceSection: '#experience',
-    experienceList: '#experience ~ .pvs-list__outer-container ul.pvs-list',
-    experienceItem: '.pvs-entity',
-    experienceTitle: '.t-bold span[aria-hidden="true"]',
-    experienceCompany: '.t-normal span[aria-hidden="true"]',
-    experienceDuration: '.pvs-entity__caption-wrapper span[aria-hidden="true"]',
+    experienceSection: '#experience, section:has(h2:has-text("Doświadczenie")), section:has(h2:has-text("Experience"))',
+    experienceList: '#experience ~ div ul, section:has(h2:has-text("Doświadczenie")) ul',
+    experienceItem: 'li:has(a[href*="/company/"])',
+    experienceTitle: 'li span[aria-hidden="true"]:first-of-type',
+    experienceCompany: 'li a[href*="/company/"] span[aria-hidden="true"]',
+    experienceDuration: 'li span:has-text("–"), li span:has-text("-")',
 
     // Contact info
-    contactInfoButton: '#top-card-text-details-contact-info',
-    contactInfoModal: '.pv-contact-info',
-    contactEmail: '.pv-contact-info__contact-type.ci-email a',
-    contactPhone: '.pv-contact-info__contact-type.ci-phone span',
-    contactWebsite: '.pv-contact-info__contact-type.ci-websites a',
+    contactInfoButton: 'a[href*="contact-info"], button:has-text("Informacje kontaktowe"), #top-card-text-details-contact-info',
+    contactInfoModal: '[role="dialog"], .artdeco-modal',
+    contactEmail: 'a[href^="mailto:"]',
+    contactPhone: 'a[href^="tel:"], span:has-text("+48"), span:has-text("+1")',
+    contactWebsite: 'a[href*="http"]:not([href*="linkedin"])',
 
     // Connection degree
-    connectionDegree: '.dist-value',
-    connectionDegreeAlternative: '.pv-text-details__right-panel span.dist-value',
+    connectionDegree: 'span:has-text("1st"), span:has-text("2nd"), span:has-text("3rd")',
+    connectionDegreeAlternative: 'span[class*="dist-value"]',
 
     // Profile image
-    profileImage: '.pv-top-card-profile-picture__image',
+    profileImage: 'main img[alt], img[class*="profile-picture"]',
   },
 
   // ============================================
   // Connection Actions
   // ============================================
   connection: {
-    // Connect button variations
-    connectButton: 'button[aria-label*="Invite"][aria-label*="to connect"]',
-    connectButtonAlt1: 'button:has-text("Connect")',
-    connectButtonAlt2: '.pvs-profile-actions button:has-text("Connect")',
-    moreButton: 'button[aria-label="More actions"]',
-    connectInDropdown: 'div[aria-label="Invite"][role="button"]',
+    // Connect button variations - bilingual PL/EN
+    connectButton: 'button[aria-label*="Zaproś"], button[aria-label*="Invite"], button[aria-label*="connect"]',
+    connectButtonAlt1: 'button:has-text("Nawiąż kontakt"), button:has-text("Connect")',
+    connectButtonAlt2: 'main button:has-text("Nawiąż"), main button:has-text("Connect")',
+    moreButton: 'button[aria-label*="Więcej"], button[aria-label*="More"]',
+    connectInDropdown: '[role="menuitem"]:has-text("Nawiąż"), [role="menuitem"]:has-text("Connect")',
 
     // Send invitation modal
-    invitationModal: '.send-invite',
-    addNoteButton: 'button[aria-label="Add a note"]',
-    noteTextarea: 'textarea[name="message"]',
-    noteTextareaAlt: '#custom-message',
-    sendButton: 'button[aria-label="Send invitation"]',
-    sendButtonAlt: 'button:has-text("Send")',
+    invitationModal: '[role="dialog"]:has(textarea), .artdeco-modal:has(textarea)',
+    addNoteButton: 'button:has-text("Dodaj notatkę"), button:has-text("Add a note")',
+    noteTextarea: 'textarea[name="message"], textarea#custom-message, [role="dialog"] textarea',
+    noteTextareaAlt: 'textarea',
+    sendButton: 'button[aria-label*="Wyślij zaproszenie"], button[aria-label*="Send invitation"]',
+    sendButtonAlt: 'button:has-text("Wyślij"), button:has-text("Send")',
 
     // Already connected / pending
-    messageButton: 'button[aria-label*="Message"]',
-    pendingButton: 'button[aria-label*="Pending"]',
-    followingButton: 'button[aria-label*="Following"]',
+    messageButton: 'button[aria-label*="Wiadomość"], button[aria-label*="Message"]',
+    pendingButton: 'button[aria-label*="Oczekuje"], button[aria-label*="Pending"]',
+    followingButton: 'button[aria-label*="Obserwujesz"], button[aria-label*="Following"]',
   },
 
   // ============================================
   // Modals & Popups
   // ============================================
   modals: {
-    overlay: '.artdeco-modal-overlay',
-    container: '.artdeco-modal',
-    closeButton: 'button[aria-label="Dismiss"]',
-    closeButtonAlt: 'button.artdeco-modal__dismiss',
+    overlay: '.artdeco-modal-overlay, [class*="modal-overlay"]',
+    container: '.artdeco-modal, [role="dialog"]',
+    closeButton: 'button[aria-label*="Zamknij"], button[aria-label*="Dismiss"], button[aria-label*="Close"]',
+    closeButtonAlt: '[role="dialog"] button:first-of-type, .artdeco-modal__dismiss',
 
     // Specific modals
-    joinModal: '[data-test-modal-id="join-now-modal"]',
-    signInModal: '[data-test-modal-id="sign-in-modal"]',
-    premiumModal: '.premium-upsell-modal',
+    joinModal: '[role="dialog"]:has-text("Dołącz"), [role="dialog"]:has-text("Join")',
+    signInModal: '[role="dialog"]:has-text("Zaloguj"), [role="dialog"]:has-text("Sign in")',
+    premiumModal: '[role="dialog"]:has-text("Premium"), [class*="premium"]',
   },
 
   // ============================================
@@ -144,11 +149,11 @@ export const SELECTORS = {
   // Navigation
   // ============================================
   navigation: {
-    homeLink: 'a[href*="/feed/"]',
-    myNetworkLink: 'a[href*="/mynetwork/"]',
-    messagingLink: 'a[href*="/messaging/"]',
+    homeLink: 'a[href*="/feed/"], button:has-text("Strona główna"), button:has-text("Home")',
+    myNetworkLink: 'a[href*="/mynetwork/"], button:has-text("Moja sieć"), button:has-text("My Network")',
+    messagingLink: 'a[href*="/messaging/"], button:has-text("Wiadomości"), button:has-text("Messaging")',
     profileLink: 'a[href*="/in/"]',
-    navBar: '.global-nav',
+    navBar: 'nav, header, [role="banner"]',
   },
 
   // ============================================

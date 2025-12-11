@@ -197,6 +197,7 @@ export interface Config {
     readingProfile: DelayConfig;
     afterSearch: DelayConfig;
     betweenScrolls: DelayConfig;
+    microPause: DelayConfig;
   };
   session: {
     pauseInterval: number;

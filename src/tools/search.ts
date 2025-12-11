@@ -130,52 +130,174 @@ function buildSearchUrl(query: string, location?: string): string {
 
 async function parseSearchResults(browser: BrowserManager, limit: number): Promise<SearchResult[]> {
   const page = browser.getPage();
-  const results: SearchResult[] = [];
 
-  // Get all result items
-  const items = await page.$$(SELECTORS.search.resultItem);
+  // First, get debug info about the DOM structure
+  const debugInfo = await page.evaluate(() => {
+    const info: string[] = [];
 
-  for (let i = 0; i < Math.min(items.length, limit); i++) {
-    const item = items[i];
+    // Check what's in main
+    const main = document.querySelector('main');
+    info.push(`main exists: ${!!main}`);
 
-    try {
-      // Extract name
-      const nameElement = await item.$(SELECTORS.search.resultName) ||
-                          await item.$(SELECTORS.search.resultNameAlternative);
-      const name = nameElement ? (await nameElement.textContent())?.trim() : null;
+    if (main) {
+      // Find all links with /in/
+      const allLinks = main.querySelectorAll('a[href*="/in/"]');
+      info.push(`links with /in/: ${allLinks.length}`);
 
-      // Extract headline
-      const headlineElement = await item.$(SELECTORS.search.resultHeadline);
-      const headline = headlineElement ? (await headlineElement.textContent())?.trim() : '';
+      // Show first 3 links structure
+      for (let i = 0; i < Math.min(3, allLinks.length); i++) {
+        const link = allLinks[i] as HTMLAnchorElement;
+        info.push(`--- Link ${i} ---`);
+        info.push(`href: ${link.href}`);
+        info.push(`innerHTML: ${link.innerHTML.substring(0, 200)}`);
+        info.push(`parent tag: ${link.parentElement?.tagName}`);
+        info.push(`grandparent tag: ${link.parentElement?.parentElement?.tagName}`);
 
-      // Extract location
-      const locationElement = await item.$(SELECTORS.search.resultLocation);
-      const location = locationElement ? (await locationElement.textContent())?.trim() : '';
-
-      // Extract profile URL
-      const linkElement = await item.$(SELECTORS.search.resultNameAlternative);
-      const href = linkElement ? await linkElement.getAttribute('href') : null;
-      const profileUrl = href ? normalizeProfileUrl(href) : '';
-
-      // Extract connection degree
-      const degreeElement = await item.$(SELECTORS.search.resultConnectionDegree);
-      const connectionDegree = degreeElement ? (await degreeElement.textContent())?.trim() : '';
-
-      if (name && profileUrl) {
-        results.push({
-          name: name || 'Unknown',
-          headline: headline || '',
-          location: location || '',
-          profile_url: profileUrl,
-          connection_degree: connectionDegree || '',
-        });
+        // Walk up and show structure
+        let el: Element | null = link;
+        const path: string[] = [];
+        for (let j = 0; j < 8; j++) {
+          el = el?.parentElement || null;
+          if (!el) break;
+          const classes = el.className ? `.${el.className.split(' ').slice(0,2).join('.')}` : '';
+          path.push(`${el.tagName}${classes}`);
+        }
+        info.push(`path up: ${path.join(' > ')}`);
       }
-    } catch (error) {
-      log('debug', `Failed to parse result item ${i}`, error);
-      // Continue with next item
-    }
-  }
 
+      // Check for list items
+      const lis = main.querySelectorAll('li');
+      info.push(`li elements in main: ${lis.length}`);
+
+      const uls = main.querySelectorAll('ul');
+      info.push(`ul elements in main: ${uls.length}`);
+
+      // Check for common LinkedIn class patterns
+      const entityResults = document.querySelectorAll('[class*="entity-result"]');
+      info.push(`entity-result elements: ${entityResults.length}`);
+
+      const searchResults = document.querySelectorAll('[class*="search-result"]');
+      info.push(`search-result elements: ${searchResults.length}`);
+
+      const reusableSearch = document.querySelectorAll('[class*="reusable-search"]');
+      info.push(`reusable-search elements: ${reusableSearch.length}`);
+    }
+
+    return info.join('\n');
+  });
+
+  log('info', `DOM Debug:\n${debugInfo}`);
+
+  // Now parse with the insight we have
+  const results = await page.evaluate((maxResults: number) => {
+    const items: Array<{
+      name: string;
+      headline: string;
+      location: string;
+      profile_url: string;
+      connection_degree: string;
+    }> = [];
+
+    const main = document.querySelector('main');
+    if (!main) return items;
+
+    // LinkedIn uses div[role="listitem"] instead of <li>!
+    // Find all listitem containers
+    const listItems = main.querySelectorAll('[role="listitem"]');
+    const processedUrls = new Set<string>();
+
+    for (const item of listItems) {
+      if (items.length >= maxResults) break;
+
+      // Find profile link - the one with simple text content (name)
+      const allLinks = item.querySelectorAll('a[href*="/in/"]');
+      let nameLink: HTMLAnchorElement | null = null;
+      let name = '';
+
+      for (const link of allLinks) {
+        const anchor = link as HTMLAnchorElement;
+        // Check if this link has simple text (just the name, not nested divs)
+        const hasNestedDivs = anchor.querySelector('div');
+        if (!hasNestedDivs) {
+          const text = anchor.textContent?.trim() || '';
+          if (text && text.length > 2 && text.length < 60) {
+            nameLink = anchor;
+            name = text;
+            break;
+          }
+        }
+      }
+
+      if (!nameLink || !name) continue;
+
+      const href = nameLink.href;
+      if (!href || !href.includes('/in/')) continue;
+
+      // Skip duplicates
+      const profileUrl = href.split('?')[0];
+      if (processedUrls.has(profileUrl)) continue;
+      processedUrls.add(profileUrl);
+
+      // Get headline and location from the container
+      const itemText = item.textContent || '';
+      let headline = '';
+      let location = '';
+
+      // Find paragraphs or spans with relevant content
+      const textElements = item.querySelectorAll('p, span');
+      const texts: string[] = [];
+
+      textElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 5 && text.length < 400 &&
+            text !== name &&
+            !text.includes('Wiadomość') && !text.includes('Message') &&
+            !text.includes('Nawiąż') && !text.includes('Connect') &&
+            !text.includes('Obserwuj') && !text.includes('Follow') &&
+            !text.includes('Wypróbuj Premium')) {
+          if (!texts.includes(text)) {
+            texts.push(text);
+          }
+        }
+      });
+
+      // Parse texts - headline is usually job title, location has geographic markers
+      for (const text of texts) {
+        // Location detection
+        if (!location && (
+            text.includes('Polska') || text.includes('Poland') ||
+            text.includes('Woj.') || text.includes('okolice') ||
+            (text.includes(',') && text.length < 60)
+        )) {
+          location = text;
+          continue;
+        }
+        // Headline is usually the first substantial text that's not location
+        if (!headline && text.length > 10 && !text.includes(name)) {
+          headline = text;
+        }
+      }
+
+      // Connection degree
+      let connectionDegree = '';
+      const degreeMatch = itemText.match(/[•·]\s*(1st|2nd|3rd|3\.\+|1\.|2\.|3\.)/);
+      if (degreeMatch) {
+        connectionDegree = degreeMatch[1];
+      }
+
+      items.push({
+        name,
+        headline,
+        location,
+        profile_url: profileUrl,
+        connection_degree: connectionDegree,
+      });
+    }
+
+    return items;
+  }, limit);
+
+  log('info', `Parsed ${results.length} results from page`);
   return results;
 }
 

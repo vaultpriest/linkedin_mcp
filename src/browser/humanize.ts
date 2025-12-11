@@ -208,6 +208,68 @@ export async function humanType(
 }
 
 // ============================================
+// Human-like Reading Simulation
+// ============================================
+
+/**
+ * Simulates a human reading content - includes small pauses and micro-movements
+ */
+export async function simulateReading(
+  page: Page,
+  config: Config,
+  durationMs?: number
+): Promise<void> {
+  const duration = durationMs || randomDelay(config.delays.readingProfile);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < duration) {
+    // Occasionally make small mouse movements (as if following text)
+    if (Math.random() < 0.3) {
+      const viewport = page.viewportSize();
+      if (viewport) {
+        const targetX = randomBetween(200, viewport.width - 200);
+        const targetY = randomBetween(200, viewport.height - 200);
+        await page.mouse.move(targetX, targetY, { steps: randomBetween(3, 8) });
+      }
+    }
+
+    // Micro-pause (human stops to think/read)
+    await randomSleep(config.delays.microPause);
+
+    // Occasionally scroll slightly (reading more content)
+    if (Math.random() < 0.2) {
+      const scrollAmount = randomBetween(50, 150) * (Math.random() < 0.5 ? 1 : -1);
+      await page.evaluate((delta) => window.scrollBy(0, delta), scrollAmount);
+      await sleep(randomBetween(200, 500));
+    }
+  }
+}
+
+/**
+ * Occasionally adds "human distractions" - small random delays or movements
+ * Call this randomly during long operations
+ */
+export async function maybeDistraction(page: Page, config: Config): Promise<void> {
+  // 10% chance of a "distraction"
+  if (Math.random() < 0.1) {
+    // Small random pause (as if checking phone, looking away)
+    await sleep(randomBetween(1000, 3000));
+
+    // Maybe small mouse movement
+    if (Math.random() < 0.5) {
+      const viewport = page.viewportSize();
+      if (viewport) {
+        await page.mouse.move(
+          randomBetween(0, viewport.width),
+          randomBetween(0, viewport.height),
+          { steps: 2 }
+        );
+      }
+    }
+  }
+}
+
+// ============================================
 // Session Management
 // ============================================
 
@@ -216,6 +278,7 @@ export class SessionManager {
   private actionsCount: number = 0;
   private sessionStartTime: number = Date.now();
   private config: Config;
+  private consecutiveActions: number = 0;
 
   constructor(config: Config) {
     this.config = config;
@@ -223,15 +286,27 @@ export class SessionManager {
 
   async beforeAction(): Promise<void> {
     this.actionsCount++;
+    this.consecutiveActions++;
     const now = Date.now();
 
     // Check if we need a session pause
     const sessionDuration = now - this.sessionStartTime;
     if (sessionDuration > this.config.session.pauseInterval) {
-      console.error(`[SESSION] Taking a break (${this.config.session.pauseDuration / 1000}s)...`);
+      console.error(`[SESSION] Taking a break (${Math.round(this.config.session.pauseDuration / 1000)}s)...`);
       await sleep(this.config.session.pauseDuration);
       this.sessionStartTime = Date.now();
+      this.consecutiveActions = 0;
       console.error('[SESSION] Break finished, resuming...');
+    }
+
+    // After many consecutive actions, add extra delay (fatigue simulation)
+    if (this.consecutiveActions > 10) {
+      const extraDelay = randomBetween(500, 1500);
+      await sleep(extraDelay);
+      // Reset counter occasionally
+      if (Math.random() < 0.3) {
+        this.consecutiveActions = 0;
+      }
     }
 
     // Ensure minimum delay between actions

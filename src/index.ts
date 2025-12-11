@@ -20,6 +20,7 @@ import { connectTool, handleConnect } from './tools/connect.js';
 import { navigateTool, handleNavigate } from './tools/navigate.js';
 import { clickTool, handleClick } from './tools/click.js';
 import { typeTool, handleType } from './tools/type.js';
+import { debugTool, handleDebug } from './tools/debug.js';
 
 // Initialize browser manager (singleton)
 let browserManager: BrowserManager | null = null;
@@ -43,6 +44,7 @@ const tools: Tool[] = [
   navigateTool,
   clickTool,
   typeTool,
+  debugTool,
 ];
 
 // Tool handlers mapping
@@ -57,6 +59,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   linkedin_navigate: handleNavigate,
   linkedin_click: handleClick,
   linkedin_type: handleType,
+  linkedin_debug_dom: handleDebug,
 };
 
 // Create MCP Server

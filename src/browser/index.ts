@@ -54,18 +54,18 @@ export class BrowserManager {
 
     try {
       // Launch browser with persistent context (keeps session)
+      // Use real Chrome instead of Chromium for Testing - less detectable
       this.context = await chromium.launchPersistentContext(
         this.config.userDataDir,
         {
+          channel: 'chrome', // Use installed Chrome, not Chromium for Testing
           headless: this.config.headless,
           viewport: { width: 1280, height: 800 },
-          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
           locale: 'pl-PL',
           timezoneId: 'Europe/Warsaw',
           args: [
             '--disable-blink-features=AutomationControlled',
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
           ],
         }
       );
