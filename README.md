@@ -41,7 +41,7 @@ Dodaj do `~/.claude.json` lub `.claude/settings.json`:
 
 | Zmienna | Domyślna | Opis |
 |---------|----------|------|
-| `LINKEDIN_USER_DATA_DIR` | `~/.playwright-profiles/linkedin` | Katalog z profilem przeglądarki |
+| `LINKEDIN_USER_DATA_DIR` | `~/.playwright-profiles/linkedin-mcp` | Katalog z profilem przeglądarki |
 | `HEADLESS` | `false` | Tryb headless (bez okna) |
 | `LOG_LEVEL` | `info` | Poziom logowania: debug, info, warn, error |
 
@@ -63,6 +63,15 @@ linkedin_search: "Marketing Director Poland"
 ```
 linkedin_get_profile: "https://linkedin.com/in/jankowalski"
 ```
+
+**Zwracane dane:**
+- `first_name`, `last_name`, `full_name` - imię i nazwisko
+- `headline` - nagłówek profilu
+- `location` - lokalizacja (miasto, region, kraj)
+- `current_company` - obecna firma (z przycisku "Obecna firma" lub sekcji doświadczenia)
+- `current_position` - obecne stanowisko
+- `about` - sekcja "O mnie"
+- `profile_url` - URL profilu
 
 ### Wysyłanie zaproszenia
 ```
@@ -125,6 +134,15 @@ To narzędzie:
 | `<ul>` | `<div role="list">` |
 | `.entity-result` | Losowe klasy CSS |
 
+### Parser profilu (grudzień 2024)
+
+Parser używa kilku strategii do wyciągania danych:
+1. **current_company** - z przycisku `button[aria-label*="Obecna firma"]` w nagłówku profilu
+2. **current_position** - z sekcji doświadczenia (szuka elementów z "obecnie"/"present")
+3. **location** - szuka elementów zawierających wzorzec "miasto, region, kraj"
+
+**Uwaga:** JSON-LD (`<script type="application/ld+json">`) jest puste dla zalogowanych użytkowników - parser używa tylko DOM.
+
 ### Błędy przeglądarki
 
 **"Browser already in use"**
@@ -132,7 +150,7 @@ To narzędzie:
 - `pkill -f "Chrome for Testing"`
 
 **"Target page closed" / SIGTRAP**
-- Usuń pliki blokady: `rm ~/.playwright-profiles/linkedin/Singleton*`
+- Usuń pliki blokady: `rm ~/.playwright-profiles/linkedin-mcp/Singleton*`
 - Restart CLI
 
 ## Architektura

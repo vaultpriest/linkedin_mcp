@@ -114,13 +114,24 @@ async function parseProfileData(browser: BrowserManager): Promise<ProfileData> {
     headline = (await headlineElement.textContent())?.trim() || '';
   }
 
-  // Get location
+  // Get location - find element containing "Polska" or country name with comma
   let location = '';
-  const locationElement = await page.$(SELECTORS.profile.location) ||
-                          await page.$(SELECTORS.profile.locationAlternative);
-  if (locationElement) {
-    location = (await locationElement.textContent())?.trim() || '';
-  }
+  const locationResult = await page.evaluate(() => {
+    // Look for span/div in main that contains location pattern (city, region, country)
+    const elements = document.querySelectorAll('main span, main div');
+    for (const el of elements) {
+      const text = el.textContent?.trim() || '';
+      // Location typically has: city, region, country format
+      if (text.includes(',') && /Polska|Poland|Germany|UK|USA|France/i.test(text) && text.length < 100) {
+        // Make sure it's not a parent element with lots of other content
+        if (el.children.length === 0 || el.querySelector('span[aria-hidden="true"]') === null) {
+          return text;
+        }
+      }
+    }
+    return '';
+  });
+  location = locationResult;
 
   // Get about (if visible)
   let about = '';
@@ -164,6 +175,17 @@ async function parseProfileData(browser: BrowserManager): Promise<ProfileData> {
     }
   }
 
+  // Fallback: Get current company from header button "Obecna firma: X"
+  if (!currentCompany) {
+    const companyFromHeader = await page.evaluate(() => {
+      const btn = document.querySelector('button[aria-label*="Obecna firma"], button[aria-label*="Current company"]');
+      return btn?.textContent?.trim() || '';
+    });
+    if (companyFromHeader) {
+      currentCompany = companyFromHeader;
+    }
+  }
+
   // Get connection degree
   let connectionDegree = '';
   const degreeElement = await page.$(SELECTORS.profile.connectionDegree) ||
@@ -189,54 +211,108 @@ async function parseProfileData(browser: BrowserManager): Promise<ProfileData> {
 
 async function parseExperience(browser: BrowserManager): Promise<Experience[]> {
   const page = browser.getPage();
-  const experiences: Experience[] = [];
 
   try {
-    // Scroll to experience section if needed
-    const expSection = await page.$(SELECTORS.profile.experienceSection);
-    if (expSection) {
-      await expSection.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(500);
-    }
+    // Parse current position from experience section
+    // Strategy: Find spans in experience section, look for "obecnie"/"present" pattern
+    const experiences = await page.evaluate(() => {
+      const results: Array<{
+        title: string;
+        company: string;
+        duration: string;
+        is_current: boolean;
+      }> = [];
 
-    // Get experience items
-    const expItems = await page.$$(SELECTORS.profile.experienceItem);
+      // Find experience section by ID anchor
+      const expAnchor = document.getElementById('experience');
+      if (!expAnchor) return results;
 
-    for (let i = 0; i < Math.min(expItems.length, 5); i++) { // Limit to 5 most recent
-      const item = expItems[i];
+      const expSection = expAnchor.closest('section');
+      if (!expSection) return results;
 
-      try {
-        const titleElement = await item.$(SELECTORS.profile.experienceTitle);
-        const title = titleElement ? (await titleElement.textContent())?.trim() : '';
+      // Find all company links in the experience section
+      const companyLinks = expSection.querySelectorAll('a[href*="/company/"]');
 
-        const companyElement = await item.$(SELECTORS.profile.experienceCompany);
-        const company = companyElement ? (await companyElement.textContent())?.trim() : '';
+      for (const link of companyLinks) {
+        const parentLi = link.closest('li');
+        if (!parentLi) continue;
 
-        const durationElement = await item.$(SELECTORS.profile.experienceDuration);
-        const duration = durationElement ? (await durationElement.textContent())?.trim() : '';
+        const fullText = parentLi.textContent || '';
+        // Only process items with "obecnie" or "present" (current position)
+        if (!/obecnie|present/i.test(fullText)) continue;
 
-        // Check if current position
-        const isCurrent = duration?.toLowerCase().includes('present') ||
-                          duration?.toLowerCase().includes('obecnie') ||
-                          i === 0; // First item is usually current
+        // Get all visible text spans
+        const spans = parentLi.querySelectorAll('span[aria-hidden="true"]');
+        const texts: string[] = [];
 
-        if (title || company) {
-          experiences.push({
-            title: title || '',
-            company: company || '',
-            duration: duration || '',
-            is_current: isCurrent,
-          });
+        for (const span of spans) {
+          // Skip nested spans (to avoid duplicates)
+          if (span.querySelector('span[aria-hidden="true"]')) continue;
+          const text = span.textContent?.trim() || '';
+          if (text.length > 2 && text.length < 100) {
+            texts.push(text);
+          }
         }
-      } catch {
-        // Continue with next item
-      }
-    }
-  } catch {
-    // Experience section might not be accessible
-  }
 
-  return experiences;
+        // Pattern recognition:
+        // texts[0] = Company name
+        // texts[1] = "Pełny etat · X lat Y mies." (employment type)
+        // texts[2] = Job title (BEFORE the date with "obecnie")
+        // texts[3] = "kwi 2022 –obecnie · 3 lata9 mies." (date with "obecnie")
+
+        let company = '';
+        let title = '';
+        let duration = '';
+
+        // Find the span with "obecnie" to anchor our search
+        const obecnieIndex = texts.findIndex(t => /obecnie|present/i.test(t));
+
+        if (obecnieIndex >= 0) {
+          // Duration is the span with "obecnie"
+          duration = texts[obecnieIndex];
+
+          // Title is typically right before the "obecnie" span
+          // But we need to skip employment type patterns
+          for (let i = obecnieIndex - 1; i >= 0; i--) {
+            const candidate = texts[i];
+            // Skip employment type, duration patterns, locations
+            if (/Pełny etat|Full-time|Part-time|Contract/i.test(candidate)) continue;
+            if (/\d+\s*(lat|rok|mies|year|month)/i.test(candidate)) continue;
+            if (/Poland|Polska|Warsaw|Warszawa|Wrocław|Kraków|Poznań|Gdańsk|District/i.test(candidate)) continue;
+
+            // This is likely the title
+            title = candidate;
+            break;
+          }
+
+          // Company is usually the first text or from company link
+          const companySpan = link.querySelector('span[aria-hidden="true"]');
+          company = companySpan?.textContent?.trim() || link.textContent?.trim() || '';
+
+          // If company is same as title, try texts[0]
+          if (company === title && texts.length > 0) {
+            company = texts[0];
+          }
+        }
+
+        if (title && company && title !== company) {
+          // Avoid duplicates
+          if (!results.some(r => r.title === title && r.company === company)) {
+            results.push({ title, company, duration, is_current: true });
+          }
+        }
+      }
+
+      return results;
+    });
+
+    log('info', `Parsed ${experiences.length} current experience entries from DOM`);
+    return experiences;
+
+  } catch (error) {
+    log('error', 'Failed to parse experience', error);
+    return [];
+  }
 }
 
 async function tryGetContactInfo(browser: BrowserManager): Promise<{ email?: string; phone?: string } | null> {

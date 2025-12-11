@@ -41,7 +41,7 @@ export function loadConfig(): Config {
     // Browser
     userDataDir: getEnvString(
       'LINKEDIN_USER_DATA_DIR',
-      `${process.env.HOME}/.playwright-profiles/linkedin`
+      `${process.env.HOME}/.playwright-profiles/linkedin-mcp`
     ),
     headless: getEnvBoolean('HEADLESS', false),
 
