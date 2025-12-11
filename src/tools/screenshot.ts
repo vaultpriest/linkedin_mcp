@@ -36,32 +36,33 @@ export async function handleScreenshot(
   log('info', 'Taking screenshot', { fullPage: input.full_page, element: input.element });
 
   try {
-    let screenshot: string;
+    let screenshotPath: string;
 
     if (input.element) {
       // Screenshot specific element
-      const elementScreenshot = await browser.screenshotElement(input.element);
-      if (!elementScreenshot) {
+      const elementScreenshotPath = await browser.screenshotElement(input.element);
+      if (!elementScreenshotPath) {
         return JSON.stringify({
           status: 'error',
           message: `Element not found: ${input.element}`,
         });
       }
-      screenshot = elementScreenshot;
+      screenshotPath = elementScreenshotPath;
     } else {
-      // Screenshot viewport or full page
-      screenshot = await browser.screenshot(input.full_page || false);
+      // Screenshot viewport or full page - saved to file
+      screenshotPath = await browser.screenshot(input.full_page || false);
     }
 
+    // Return file path instead of base64 to save ~25k tokens
     const response: ToolResponse<ScreenshotOutput> = {
       status: 'success',
       data: {
-        screenshot,
+        screenshot_path: screenshotPath, // File path, use Read tool to view
         current_url: browser.getCurrentUrl(),
       },
     };
 
-    log('info', 'Screenshot taken successfully');
+    log('info', `Screenshot saved: ${screenshotPath}`);
     return JSON.stringify(response);
 
   } catch (error) {

@@ -89,13 +89,13 @@ export async function handleClick(
   } catch (error) {
     log('error', 'Click failed', error);
 
-    // Return screenshot to help debug
-    const screenshot = await browser.screenshot(false);
+    // Save screenshot to file instead of base64
+    const screenshotPath = await browser.screenshot(false);
     return JSON.stringify({
       status: 'needs_human',
       reason: 'element_not_found',
-      screenshot,
-      hint: `Could not click element: ${input.selector || input.text}. Check screenshot.`,
+      screenshot_path: screenshotPath,
+      hint: `Could not click element: ${input.selector || input.text}. Screenshot saved to: ${screenshotPath}`,
       current_url: browser.getCurrentUrl(),
     });
   }

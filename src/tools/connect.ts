@@ -230,12 +230,12 @@ async function createProblemResponse(
   reason: string,
   hint?: string
 ): Promise<ToolResponse<never>> {
-  const screenshot = await browser.screenshot(false);
+  const screenshotPath = await browser.screenshot(false);
   return {
     status: 'needs_human',
     reason: reason as any,
-    screenshot,
-    hint: hint || `Problem detected: ${reason}`,
+    screenshot_path: screenshotPath,
+    hint: hint || `Problem detected: ${reason}. Screenshot saved to: ${screenshotPath}`,
     current_url: browser.getCurrentUrl(),
   };
 }

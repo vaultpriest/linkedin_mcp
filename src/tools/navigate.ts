@@ -44,12 +44,12 @@ export async function handleNavigate(
     const navResult = await browser.navigate(input.url);
 
     if (!navResult.success) {
-      const screenshot = await browser.screenshot(false);
+      const screenshotPath = await browser.screenshot(false);
       return JSON.stringify({
         status: 'needs_human',
         reason: navResult.problem || 'navigation_failed',
-        screenshot,
-        hint: 'Navigation failed - check the screenshot',
+        screenshot_path: screenshotPath,
+        hint: `Navigation failed. Screenshot saved to: ${screenshotPath}`,
         current_url: browser.getCurrentUrl(),
       });
     }
@@ -59,12 +59,12 @@ export async function handleNavigate(
     const problem = await detector.detectProblems(page);
 
     if (problem) {
-      const screenshot = await browser.screenshot(false);
+      const screenshotPath = await browser.screenshot(false);
       return JSON.stringify({
         status: 'needs_human',
         reason: problem.reason,
-        screenshot,
-        hint: problem.hint,
+        screenshot_path: screenshotPath,
+        hint: `${problem.hint}. Screenshot saved to: ${screenshotPath}`,
         current_url: browser.getCurrentUrl(),
       });
     }

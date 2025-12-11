@@ -74,12 +74,12 @@ export async function handleType(
   } catch (error) {
     log('error', 'Typing failed', error);
 
-    const screenshot = await browser.screenshot(false);
+    const screenshotPath = await browser.screenshot(false);
     return JSON.stringify({
       status: 'needs_human',
       reason: 'element_not_found',
-      screenshot,
-      hint: `Could not type into element: ${input.selector}. Check screenshot.`,
+      screenshot_path: screenshotPath,
+      hint: `Could not type into element: ${input.selector}. Screenshot saved to: ${screenshotPath}`,
       current_url: browser.getCurrentUrl(),
     });
   }

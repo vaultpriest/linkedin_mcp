@@ -23,7 +23,7 @@ export interface SuccessResponse<T> {
 export interface NeedsHumanResponse {
   status: 'needs_human';
   reason: ProblemReason;
-  screenshot?: string;  // base64 PNG
+  screenshot_path?: string;  // File path to saved JPEG (use Read tool to view)
   hint: string;
   current_url?: string;
 }
@@ -131,7 +131,7 @@ export interface ScreenshotInput {
 }
 
 export interface ScreenshotOutput {
-  screenshot: string;  // base64 PNG
+  screenshot_path: string;  // File path to saved JPEG (use Read tool to view)
   current_url: string;
 }
 

@@ -66,11 +66,12 @@ export async function handleScroll(
     // Check for problems
     const problem = await detector.detectProblems(page);
     if (problem) {
+      const screenshotPath = await browser.screenshot(false);
       return JSON.stringify({
         status: 'needs_human',
         reason: problem.reason,
-        hint: problem.hint,
-        screenshot: await browser.screenshot(false),
+        hint: `${problem.hint}. Screenshot saved to: ${screenshotPath}`,
+        screenshot_path: screenshotPath,
         current_url: browser.getCurrentUrl(),
       });
     }

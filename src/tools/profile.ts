@@ -292,12 +292,14 @@ async function createProblemResponse(
   reason: string,
   hint?: string
 ): Promise<ToolResponse<never>> {
-  const screenshot = await browser.screenshot(false);
+  // Save screenshot to file instead of returning base64
+  // This reduces response size from ~25k tokens to ~100 tokens
+  const screenshotPath = await browser.screenshot(false);
   return {
     status: 'needs_human',
     reason: reason as any,
-    screenshot,
-    hint: hint || `Problem detected: ${reason}`,
+    screenshot_path: screenshotPath, // File path instead of base64
+    hint: hint || `Problem detected: ${reason}. Screenshot saved to: ${screenshotPath}`,
     current_url: browser.getCurrentUrl(),
   };
 }

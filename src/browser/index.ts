@@ -6,6 +6,11 @@ import { log } from '../config.js';
 import { SessionManager, humanClick, humanType, humanScroll, humanMouseMove, randomSleep, sleep } from './humanize.js';
 import { SELECTORS } from './selectors.js';
 import { ProblemDetector } from '../detector/index.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Directory for screenshots
+const SCREENSHOT_DIR = '/tmp/linkedin-mcp-screenshots';
 
 export class BrowserManager {
   private browser: Browser | null = null;
@@ -33,9 +38,16 @@ export class BrowserManager {
   // ============================================
 
   async initialize(): Promise<void> {
+    // Check if browser is actually alive (not just flagged as initialized)
     if (this.state.isInitialized) {
-      log('debug', 'Browser already initialized');
-      return;
+      const isAlive = await this.isBrowserAlive();
+      if (isAlive) {
+        log('debug', 'Browser already initialized and alive');
+        return;
+      } else {
+        log('warn', 'Browser was closed externally, reinitializing...');
+        this.resetState();
+      }
     }
 
     log('info', 'Initializing browser...');
@@ -81,13 +93,39 @@ export class BrowserManager {
     log('info', 'Closing browser...');
 
     if (this.context) {
-      await this.context.close();
+      try {
+        await this.context.close();
+      } catch {
+        // Already closed
+      }
       this.context = null;
       this.page = null;
     }
 
     this.state.isInitialized = false;
     log('info', 'Browser closed');
+  }
+
+  // Check if browser is actually alive
+  private async isBrowserAlive(): Promise<boolean> {
+    if (!this.page || !this.context) {
+      return false;
+    }
+    try {
+      // Try to get the URL - this will throw if browser is closed
+      await this.page.evaluate(() => window.location.href);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Reset state for reinitialization
+  private resetState(): void {
+    this.browser = null;
+    this.context = null;
+    this.page = null;
+    this.state.isInitialized = false;
   }
 
   // ============================================
@@ -244,29 +282,77 @@ export class BrowserManager {
   }
 
   // ============================================
-  // Screenshots
+  // Screenshots - saved to file, not returned as base64
   // ============================================
 
+  /**
+   * Take screenshot and save to file. Returns file path instead of base64.
+   * This dramatically reduces token usage (~25k -> ~100 tokens per screenshot).
+   */
   async screenshot(fullPage: boolean = false): Promise<string> {
     const page = this.getPage();
-    const buffer = await page.screenshot({
+
+    // Ensure screenshot directory exists
+    if (!fs.existsSync(SCREENSHOT_DIR)) {
+      fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    }
+
+    const filename = `screenshot-${Date.now()}.jpeg`;
+    const filepath = path.join(SCREENSHOT_DIR, filename);
+
+    await page.screenshot({
+      path: filepath,
       fullPage,
-      type: 'png',
+      type: 'jpeg',
+      quality: 60, // Compress to reduce file size
     });
-    return buffer.toString('base64');
+
+    log('info', `Screenshot saved: ${filepath}`);
+    return filepath;
   }
 
+  /**
+   * Take screenshot of specific element and save to file.
+   */
   async screenshotElement(selector: string): Promise<string | null> {
     const page = this.getPage();
     try {
       const element = await page.$(selector);
       if (!element) return null;
 
-      const buffer = await element.screenshot({ type: 'png' });
-      return buffer.toString('base64');
+      // Ensure screenshot directory exists
+      if (!fs.existsSync(SCREENSHOT_DIR)) {
+        fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+      }
+
+      const filename = `element-${Date.now()}.jpeg`;
+      const filepath = path.join(SCREENSHOT_DIR, filename);
+
+      await element.screenshot({
+        path: filepath,
+        type: 'jpeg',
+        quality: 60,
+      });
+
+      log('info', `Element screenshot saved: ${filepath}`);
+      return filepath;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Get screenshot as base64 - use sparingly! Only for explicit screenshot tool.
+   * For internal problem detection, use screenshot() which saves to file.
+   */
+  async screenshotBase64(fullPage: boolean = false): Promise<string> {
+    const page = this.getPage();
+    const buffer = await page.screenshot({
+      fullPage,
+      type: 'jpeg',
+      quality: 50, // Lower quality for smaller size
+    });
+    return buffer.toString('base64');
   }
 
   // ============================================
